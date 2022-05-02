@@ -75,7 +75,7 @@ contract ERC20Voting is MajorityVoting {
         uint64 snapshotBlock = getBlockNumber64() - 1;
 
         uint256 votingPower = votingToken.getPastTotalSupply(snapshotBlock);
-        if (votingPower == 0) revert VotePowerZero();
+        if (votingPower == 0) revert ZeroValueNotAllowed();
         
         voteId = votesLength++;
 

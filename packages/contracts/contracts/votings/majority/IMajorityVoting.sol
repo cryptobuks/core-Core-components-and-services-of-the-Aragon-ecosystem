@@ -38,7 +38,7 @@ interface IMajorityVoting {
     error VoteDurationZero();
     error VoteCastForbidden(uint256 voteId, address sender);
     error VoteExecutionForbidden(uint256 voteId);
-    error VotePowerZero();
+    error ZeroValueNotAllowed();
 
     event StartVote(uint256 indexed voteId, address indexed creator, bytes metadata);
     event CastVote(uint256 indexed voteId, address indexed voter, uint8 voterState, uint256 voterWeight);
