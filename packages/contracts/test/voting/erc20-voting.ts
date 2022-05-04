@@ -137,7 +137,7 @@ describe('ERC20Voting', function () {
       ]);
     });
 
-    it('should create a vote and cast a vote immediatelly', async () => {
+    it('should create a vote and cast a vote immediately', async () => {
       await erc20VoteMock.mock.getPastTotalSupply.returns(1);
       await erc20VoteMock.mock.getPastVotes.returns(1);
 
@@ -164,12 +164,12 @@ describe('ERC20Voting', function () {
 
   describe('Vote + Execute:', async () => {
     let minDuration = 500;
-    let supportRequired = pct16(50);
-    let minimumQuorom = pct16(20);
+    let supportRequiredPct = pct16(50);
+    let participationRequiredPct = pct16(20);
     let votingPower = 100;
 
     beforeEach(async () => {
-      await initializeVoting(minimumQuorom, supportRequired, minDuration);
+      await initializeVoting(participationRequiredPct, supportRequiredPct, minDuration);
 
       // set voting power to 100
       await erc20VoteMock.mock.getPastTotalSupply.returns(votingPower);
@@ -194,23 +194,29 @@ describe('ERC20Voting', function () {
 
       let vote = await voting.getVote(0);
       expect(vote.yea).to.equal(1);
+      expect(vote.nay).to.equal(0);
+      expect(vote.abstain).to.equal(0);
 
       expect(await voting.vote(0, VoterState.Nay, false))
         .to.emit(voting, EVENTS.CAST_VOTE)
         .withArgs(0, ownerAddress, VoterState.Nay, 1);
 
       vote = await voting.getVote(0);
+      expect(vote.yea).to.equal(0);
       expect(vote.nay).to.equal(1);
+      expect(vote.abstain).to.equal(0);
 
       expect(await voting.vote(0, VoterState.Abstain, false))
         .to.emit(voting, EVENTS.CAST_VOTE)
         .withArgs(0, ownerAddress, VoterState.Abstain, 1);
 
       vote = await voting.getVote(0);
+      expect(vote.yea).to.equal(0);
+      expect(vote.nay).to.equal(0);
       expect(vote.abstain).to.equal(1);
     });
 
-    it('voting multiple times should not increase yea,nay or abstain multiple times', async () => {
+    it('should not double-count votes by the same address', async () => {
       await erc20VoteMock.mock.getPastVotes.returns(1);
 
       // yea still ends up to be 1 here even after voting
@@ -230,7 +236,7 @@ describe('ERC20Voting', function () {
       expect((await voting.getVote(0)).abstain).to.equal(1);
     });
 
-    it('makes executable if enough yea is given from voting power', async () => {
+    it('can execute if enough yea is given from voting power', async () => {
       // vote with yea as 50 voting stake, which is still
       // not enough to make vote executable as support required percentage
       // is set to supportRequired = 51.
@@ -247,7 +253,7 @@ describe('ERC20Voting', function () {
       expect(await voting.canExecute(0)).to.equal(true);
     });
 
-    it('returns executable if enough yea is given depending on yea+nay+abstain total', async () => {
+    it('can execute if enough yea votes are given depending on yea+nay+abstain total', async () => {
       // vote with yea as 50 voting stake, which is still enough
       // to make vote executable even if the vote is closed due to
       // its duration length.
@@ -262,14 +268,14 @@ describe('ERC20Voting', function () {
       await erc20VoteMock.mock.getPastVotes.returns(10);
       await voting.connect(signers[2]).vote(0, VoterState.Abstain, false);
 
-      // makes the voting closed.
+      // closes the vote
       await ethers.provider.send('evm_increaseTime', [minDuration + 10]);
       await ethers.provider.send('evm_mine', []);
 
       expect(await voting.canExecute(0)).to.equal(true);
     });
 
-    it("makes NON-executable if enough yea isn't given depending on yea + nay + abstain total", async () => {
+    it("cannot execute if enough yea isn't given depending on yea + nay + abstain total", async () => {
       // vote with yea as 20 voting stake, which is still not enough
       // to make vote executable while vote is open or even after it's closed.
       // supports
@@ -284,14 +290,14 @@ describe('ERC20Voting', function () {
       await erc20VoteMock.mock.getPastVotes.returns(5);
       await voting.connect(signers[2]).vote(0, VoterState.Abstain, false);
 
-      // makes the voting closed.
+      // closes the vote
       await ethers.provider.send('evm_increaseTime', [minDuration + 10]);
       await ethers.provider.send('evm_mine', []);
 
       expect(await voting.canExecute(0)).to.equal(false);
     });
 
-    it('executes the vote immediatelly while final yea is given', async () => {
+    it('executes the vote immediately while final yea is given', async () => {
       // vote with supportRequired staking, so
       // it immediatelly executes the vote
       await erc20VoteMock.mock.getPastVotes.returns(51);
@@ -326,6 +332,97 @@ describe('ERC20Voting', function () {
       await expect(voting.execute(0)).to.be.revertedWith(
         customError('VoteExecutionForbidden', 0)
       );
+    });
+  });
+
+  describe('Configurations for different use cases', async () => {
+    describe('A simple majority vote with >50% support and >25% participation required', async () => {
+      let minDuration = 500;
+      let supportRequiredPct = pct16(50);
+      let participationRequiredPct = pct16(25);
+      let votingPower = 100;
+
+      beforeEach(async () => {
+        await initializeVoting(participationRequiredPct, supportRequiredPct, minDuration);
+
+        // set voting power to 100
+        await erc20VoteMock.mock.getPastTotalSupply.returns(votingPower);
+
+        await voting.newVote('0x00', dummyActions, 0, 0, false, VoterState.None);
+      });
+
+      it('does not execute if support is high enough but participation and approval (absolute support) are too low', async () => {
+        await erc20VoteMock.mock.getPastVotes.returns(10);
+        // app ! dur | par | sup
+        // 10% !  0  | 10% | 100%
+        //  ✓  !  𐄂  |  𐄂  |  ✓ 
+        expect(await voting.canExecute(0)).to.equal(false); // Reason: approval and participation are too low
+
+        await ethers.provider.send('evm_increaseTime', [minDuration + 10]);
+        await ethers.provider.send('evm_mine', []);
+        // app ! dur | par | sup
+        // 10% ! 510 | 10% | 100%
+        //  𐄂  !  ✓  |  𐄂  |  ✓ 
+        expect(await voting.canExecute(0)).to.equal(false); // vote end does not help
+      });
+
+      it('does not execute if participation is high enough but support is too low', async () => {
+        await erc20VoteMock.mock.getPastVotes.returns(10);
+        await voting.connect(signers[0]).vote(0, VoterState.Yea, false);
+        
+        await erc20VoteMock.mock.getPastVotes.returns(20);
+        await voting.connect(signers[1]).vote(0, VoterState.Nay, false);
+        // app ! dur | par | sup
+        // 30% !  0  | 30% | 33%
+        //  𐄂  !  𐄂  |  ✓  |  𐄂 
+        expect(await voting.canExecute(0)).to.equal(false); // approval too low, duration and support criterium are not met
+
+        await ethers.provider.send('evm_increaseTime', [minDuration + 10]);
+        await ethers.provider.send('evm_mine', []);
+        // app ! dur | par | sup
+        // 30% ! 510 | 30% | 33%
+        //  𐄂  !  ✓  |  ✓  |  𐄂 
+        expect(await voting.canExecute(0)).to.equal(false); // vote end does not help
+      });
+
+      it('executes after the duration if participation, and support criteria are met', async () => {
+        await erc20VoteMock.mock.getPastVotes.returns(30);
+        await voting.connect(signers[0]).vote(0, VoterState.Yea, false);
+        // app ! dur | par | sup
+        // 30% !  0  | 30% | 100%
+        //  𐄂  !  𐄂  |  ✓  |  ✓ 
+        expect(await voting.canExecute(0)).to.equal(false); // Reason: duration criterium is not met
+
+        await ethers.provider.send('evm_increaseTime', [minDuration + 10]);
+        await ethers.provider.send('evm_mine', []);
+        // app ! dur | par | sup
+        // 30% ! 510 | 30% | 100%
+        //  𐄂  !  ✓  |  ✓  |  ✓ 
+        expect(await voting.canExecute(0)).to.equal(true); // all criteria are met
+      });
+
+      it('executes early if the approval (absolute support) exceeds the required support (assuming the latter is > 50%)', async () => {
+        await erc20VoteMock.mock.getPastVotes.returns(50);
+        await voting.connect(signers[0]).vote(0, VoterState.Yea, false);
+        // app ! dur | par | sup
+        // 50% !  0  | 50% | 100%
+        //  𐄂  !  𐄂  |  ✓  |  ✓ 
+        expect(await voting.canExecute(0)).to.equal(false); // Reason: app > supReq == false
+
+        await erc20VoteMock.mock.getPastVotes.returns(10);
+        await voting.connect(signers[1]).vote(0, VoterState.Yea, false);
+        // app ! dur | par | sup
+        // 60% !  0  | 60% | 100%
+        //  ✓  !  𐄂  |  ✓  |  ✓ 
+        expect(await voting.canExecute(0)).to.equal(true); // Correct because more voting doesn't change the outcome
+
+        await erc20VoteMock.mock.getPastVotes.returns(40);
+        await voting.connect(signers[2]).vote(0, VoterState.Nay, false);
+        // app ! dur | par | sup
+        // 60% !  0  | 100%| 60%
+        //  ✓  !  𐄂  |  ✓  |  ✓ 
+        expect(await voting.canExecute(0)).to.equal(true); // The outcome did not change
+      });
     });
   });
 });
