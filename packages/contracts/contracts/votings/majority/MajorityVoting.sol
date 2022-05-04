@@ -162,8 +162,10 @@ abstract contract MajorityVoting is IMajorityVoting, MetaTxComponent, TimeHelper
     function _canVote(uint256 _voteId, address _voter) internal view virtual returns (bool);
 
     /// @dev Internal function to check if a vote can be executed. It assumes the queried vote exists.
-    /// @notice If `participationRequiredPct` and `supportRequiredPct` realative to the total `votingPower` are reached,
-    ///         the vote is already determined and can be executed immediately even if the voting period has not ended yet.
+    /// @notice This function assumes vote configurations with `supportRequiredPct` values >= 50%.
+    ///         Under this assumption and if the number of yes votes relative to the total `votingPower` is 
+    ///         larger than `supportRequiredPct`, the vote is already determined and can execute immediately, 
+    ///         even if the voting period has not ended yet.
     /// @param _voteId vote id
     /// @return True if the given vote can be executed, false otherwise
     function _canExecute(uint256 _voteId) internal virtual view returns (bool) {
@@ -174,14 +176,11 @@ abstract contract MajorityVoting is IMajorityVoting, MetaTxComponent, TimeHelper
             return false;
         }
 
-        // Calculate the participation the total number of votes casted relative
-        uint256 participation = _calculatePct(vote_.yea + vote_.nay + vote_.abstain, vote_.votingPower);
-
-        // Early execution criterium: The vote can execute immediately, if the participation and support relative to the 
-        // total voting power is larger than the participation and support required, respectively, 
-        // even if the voting period has not ended yet.
-        if ((participation > vote_.participationRequiredPct) 
-        && (_calculatePct(vote_.yea, vote_.votingPower) > vote_.supportRequiredPct)) {
+        // Early execution criterium: The vote can execute immediately, if the number of yes votes relative to the 
+        // total voting power is larger than the relative required support, even if the voting period has not ended yet.
+        // The reasoning behind this is, assuming `supportRequiredPct` values >= 50%, that the outcome cannot change anymore, 
+        // because the majority has already approved the decision.
+        if (_calculatePct(vote_.yea, vote_.votingPower) > vote_.supportRequiredPct) {
             return true;
         }
 
@@ -191,7 +190,7 @@ abstract contract MajorityVoting is IMajorityVoting, MetaTxComponent, TimeHelper
         }
 
         // Verify that the total number of votes casted relative to the overall voting power is larger than the required relative participation.
-        if (participation <= vote_.participationRequiredPct) {
+        if (_calculatePct(vote_.yea + vote_.nay + vote_.abstain, vote_.votingPower) <= vote_.participationRequiredPct) {
             return false;
         }
 
@@ -211,7 +210,7 @@ abstract contract MajorityVoting is IMajorityVoting, MetaTxComponent, TimeHelper
         return getTimestamp64() < vote_.endDate && getTimestamp64() >= vote_.startDate && !vote_.executed;
     }
 
-     /// @dev Calculates the percentage of `_value` relative to `_total`
+    /// @dev Calculates the percentage of `_value` relative to `_total`
     /// @param _value the current value
     /// @param _total the total value
     /// @return returns if the _value is _pct or more percentage of _total.
