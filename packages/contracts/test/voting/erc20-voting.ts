@@ -236,17 +236,16 @@ describe('ERC20Voting', function () {
       expect((await voting.getVote(0)).abstain).to.equal(1);
     });
 
-    it('can execute if enough yea is given from voting power', async () => {
-      // vote with yea as 50 voting stake, which is still
-      // not enough to make vote executable as support required percentage
-      // is set to supportRequired = 51.
+    it('can execute early if support is large enough', async () => {
+      // vote with 50 yea votes, which is NOT enough to make vote executable as supportPct 
+      // must be larger than supportRequiredPct = 50
       await erc20VoteMock.mock.getPastVotes.returns(50);
 
       await voting.vote(0, VoterState.Yea, false);
       expect(await voting.canExecute(0)).to.equal(false);
 
-      // vote with yea as 1 voting stake from another wallet,
-      // which becomes 51 total and enough
+      // vote with 1 yea vote from another wallet, so that yea votes amount to 51 in total, which is
+      // enough to make vote executable as supportPct supportRequiredPct = 50
       await erc20VoteMock.mock.getPastVotes.returns(1);
       await voting.connect(signers[1]).vote(0, VoterState.Yea, false);
 
@@ -254,17 +253,15 @@ describe('ERC20Voting', function () {
     });
 
     it('can execute if enough yea votes are given depending on yea+nay+abstain total', async () => {
-      // vote with yea as 50 voting stake, which is still enough
-      // to make vote executable even if the vote is closed due to
-      // its duration length.
+      // vote with 50 yea votes
       await erc20VoteMock.mock.getPastVotes.returns(50);
       await voting.vote(0, VoterState.Yea, false);
 
-      // vote with nay with 30 voting stake.
+      // vote 30 voting nay votes
       await erc20VoteMock.mock.getPastVotes.returns(30);
       await voting.connect(signers[1]).vote(0, VoterState.Nay, false);
 
-      // vote as abstain with 10 voting stake.
+      // vote with 10 abstain votes
       await erc20VoteMock.mock.getPastVotes.returns(10);
       await voting.connect(signers[2]).vote(0, VoterState.Abstain, false);
 
@@ -272,21 +269,20 @@ describe('ERC20Voting', function () {
       await ethers.provider.send('evm_increaseTime', [minDuration + 10]);
       await ethers.provider.send('evm_mine', []);
 
+      //The vote is executable as supportPct > 50%, participationPct > 20%, and the voting period is over
       expect(await voting.canExecute(0)).to.equal(true);
     });
 
     it("cannot execute if enough yea isn't given depending on yea + nay + abstain total", async () => {
-      // vote with yea as 20 voting stake, which is still not enough
-      // to make vote executable while vote is open or even after it's closed.
-      // supports
+      // vote with 10 yea votes
       await erc20VoteMock.mock.getPastVotes.returns(10);
       await voting.vote(0, VoterState.Yea, false);
 
-      // vote with nay with 5 voting stake as non-support
+      // vote with 5 nay votes
       await erc20VoteMock.mock.getPastVotes.returns(5);
       await voting.connect(signers[1]).vote(0, VoterState.Nay, false);
 
-      // vote with 5 voting stake as abstain to vote
+      // vote with 5 abstain votes
       await erc20VoteMock.mock.getPastVotes.returns(5);
       await voting.connect(signers[2]).vote(0, VoterState.Abstain, false);
 
@@ -294,6 +290,7 @@ describe('ERC20Voting', function () {
       await ethers.provider.send('evm_increaseTime', [minDuration + 10]);
       await ethers.provider.send('evm_mine', []);
 
+      //The vote is not executable because the participationPct with 20% is still too low, despite a support of 66% and the voting period being over 
       expect(await voting.canExecute(0)).to.equal(false);
     });
 

@@ -11,6 +11,10 @@ import "./../../utils/TimeHelpers.sol";
 /// @title The abstract implementation of majority voting components
 /// @author Michael Heuer - Aragon Association - 2022
 /// @notice The abstract implementation of majority voting components
+/// TODO    We use the following definitions
+/// TODO    $support = \frac{N_{yes}}{N_{yes}+N_{no}}$
+/// TODO    $relative = \frac{N_{yes}}{N_{total}}$
+/// TODO    $participation = \frac{N_{yes}+N_{no}+N_{abstain}}{N_{total}}$
 /// @dev This component implements the `IMajorityVoting` interface
 abstract contract MajorityVoting is IMajorityVoting, MetaTxComponent, TimeHelpers {
     bytes4 internal constant MAJORITY_VOTING_INTERFACE_ID = type(IMajorityVoting).interfaceId;
@@ -31,13 +35,13 @@ abstract contract MajorityVoting is IMajorityVoting, MetaTxComponent, TimeHelper
     /// @param _gsnForwarder The address of the trusted GSN forwarder required for meta transactions
     /// @param _participationRequiredPct The minimal required participation in percent.
     /// @param _supportRequiredPct The minimal required support in percent.
-    /// @param _minDuration The minimal duration of a vote
+    /// @param _minDuration The minimal duration of a vote //TODO rename to voteDuration in all associated files
     function __MajorityVoting_init(
         IDAO _dao,
         address _gsnForwarder,
         uint64 _participationRequiredPct,
         uint64 _supportRequiredPct,
-        uint64 _minDuration
+        uint64 _minDuration //TODO rename to voteDuration in all associated files
     ) internal onlyInitializing {
         _registerStandard(MAJORITY_VOTING_INTERFACE_ID);
         _validateAndSetSettings(_participationRequiredPct, _supportRequiredPct, _minDuration);
