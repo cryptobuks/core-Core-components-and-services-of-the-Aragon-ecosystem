@@ -477,7 +477,7 @@ describe('WhitelistVoting', function () {
         expect(await voting.canExecute(0)).to.equal(true);
       });
 
-      it.skip('should not execute with only 2 yes votes', async () => {
+      it('should not execute with only 2 yes votes', async () => {
         await voting.connect(signers[0]).vote(0, VoterState.Yea, false);
         await voting.connect(signers[1]).vote(0, VoterState.Yea, false);
         await voting.connect(signers[2]).vote(0, VoterState.Nay, false); 
