@@ -6,12 +6,13 @@ pragma solidity 0.8.10;
 
 import "@openzeppelin/contracts/utils/Checkpoints.sol";
 import "./../majority/MajorityVoting.sol";
+import "../../core/erc165/AdaptiveERC165.sol";
 
 /// @title A component for whitelist voting
 /// @author Giorgi Lagidze, Samuel Furter - Aragon Association - 2021-2022
 /// @notice The majority voting implementation using an ERC-20 token
 /// @dev This contract inherits from `MajorityVoting` and implements the `IMajorityVoting` interface
-contract WhitelistVoting is MajorityVoting {
+contract WhitelistVoting is AdaptiveERC165, MajorityVoting {
     using Checkpoints for Checkpoints.History;
 
     bytes4 internal constant WHITELIST_VOTING_INTERFACE_ID =
@@ -33,14 +34,12 @@ contract WhitelistVoting is MajorityVoting {
 
     /// @notice Initializes the component
     /// @dev This is required for the UUPS upgradability pattern
-    /// @param _dao The IDAO interface of the associated DAO
     /// @param _gsnForwarder The address of the trusted GSN forwarder required for meta transactions
     /// @param _participationRequiredPct The minimal required participation in percent.
     /// @param _supportRequiredPct The minimal required support in percent.
     /// @param _minDuration The minimal duration of a vote
     /// @param _whitelisted The whitelisted addresses
     function initialize(
-        IDAO _dao,
         address _gsnForwarder,
         uint64 _participationRequiredPct,
         uint64 _supportRequiredPct,
@@ -49,7 +48,6 @@ contract WhitelistVoting is MajorityVoting {
     ) public initializer {
         _registerStandard(WHITELIST_VOTING_INTERFACE_ID);
         __MajorityVoting_init(
-            _dao,
             _gsnForwarder,
             _participationRequiredPct,
             _supportRequiredPct,

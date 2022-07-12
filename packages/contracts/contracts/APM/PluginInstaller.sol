@@ -7,12 +7,18 @@ pragma solidity 0.8.10;
 import "../APM/IPluginFactory.sol";
 import "./../core/DAO.sol";
 import "../utils/UncheckedIncrement.sol";
+import "../utils/UUPSProxy.sol";
 
+interface ENS {
+
+}
 /// @title PluginInstaller to install packages on a DAO.
 /// @author Sarkawt Noori - Aragon Association - 2022
 /// @notice This contract is used to create/deploy new packages and instaling them on a DAO.
 contract PluginInstaller {
+    
     address public tokenFactory;
+    ENS public ens;
 
     /**
     NOTE: better aproach might be to have a permission ops like:
@@ -43,12 +49,17 @@ contract PluginInstaller {
         bytes args; // pre-determined value for stting up the package
     }
 
+    struct Pack {
+        bytes32 node; // namehash of the plugin (e.x - finance.aragonpm.eth) on the ens
+    }
+
     event PluginInstalled(address indexed dao, address indexed pluginAddress);
 
     error NoRootRole();
 
-    constructor(address _tokenFactory) {
+    constructor(address _tokenFactory, address _ens) {
         tokenFactory = _tokenFactory;
+        ens = ENS(_ens);
     }
 
     function installPluginsOnExistingDAO(DAO dao, Package[] calldata packages) external {
@@ -57,11 +68,17 @@ contract PluginInstaller {
         dao.revoke(address(dao), address(this), dao.ROOT_ROLE());
     }
 
-    function installPlugins(DAO dao, Package[] calldata packages) public {
-        for (uint256 i; i < packages.length; i = _uncheckedIncrement(i)) {
-            _installPlugin(dao, packages[i]);
+    function installPlugins(DAO dao, Pack[] calldata packages) public {
+        for (uint256 i = 0; i < packages.length; i++) {
+            bytes32 node = packages[i].node;
+            address repo = ens.resolve(node).addr(node);
+            address baseImplementation = repo.getLatest();
+            address proxy = new UUPSProxy(dao, baseImplementation, packages[i].args);
+
+            emit PluginInstalled(dao, proxy);
         }
     }
+
 
     function _installPlugin(DAO dao, Package calldata package) internal returns (address app) {
         // revoke root from TokenFactory

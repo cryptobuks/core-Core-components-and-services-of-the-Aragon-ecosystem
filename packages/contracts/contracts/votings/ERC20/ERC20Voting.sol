@@ -6,26 +6,25 @@ pragma solidity 0.8.10;
 
 import "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC20VotesUpgradeable.sol";
 import "./../majority/MajorityVoting.sol";
+import "../../core/erc165/AdaptiveERC165.sol";
 
 /// @title A component for ERC-20 token voting
 /// @author Giorgi Lagidze, Samuel Furter - Aragon Association - 2021-2022
 /// @notice The majority voting implementation using an ERC-20 token
 /// @dev This contract inherits from `MajorityVoting` and implements the `IMajorityVoting` interface
-contract ERC20Voting is MajorityVoting {
+contract ERC20Voting is AdaptiveERC165, MajorityVoting {
     bytes4 internal constant ERC20_VOTING_INTERFACE_ID = MAJORITY_VOTING_INTERFACE_ID ^ this.getVotingToken.selector;
 
     ERC20VotesUpgradeable private votingToken;
 
     /// @notice Initializes the component
     /// @dev This is required for the UUPS upgradability pattern
-    /// @param _dao The IDAO interface of the associated DAO
     /// @param _gsnForwarder The address of the trusted GSN forwarder required for meta transactions
     /// @param _participationRequiredPct The minimal required participation in percent.
     /// @param _supportRequiredPct The minimal required support in percent.
     /// @param _minDuration The minimal duration of a vote
     /// @param _token The ERC20 token used for voting
     function initialize(
-        IDAO _dao,
         address _gsnForwarder,
         uint64 _participationRequiredPct,
         uint64 _supportRequiredPct,
@@ -34,7 +33,6 @@ contract ERC20Voting is MajorityVoting {
     ) public initializer {
         _registerStandard(ERC20_VOTING_INTERFACE_ID);
         __MajorityVoting_init(
-            _dao,
             _gsnForwarder,
             _participationRequiredPct,
             _supportRequiredPct,

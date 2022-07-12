@@ -7,12 +7,14 @@ pragma solidity 0.8.10;
 import "./IMajorityVoting.sol";
 import "./../../core/component/MetaTxComponent.sol";
 import "./../../utils/TimeHelpers.sol";
+import "../../utils/AragonAppMeta.sol";
+import "../../core/erc165/AdaptiveERC165.sol";
 
 /// @title The abstract implementation of majority voting components
 /// @author Michael Heuer - Aragon Association - 2022
 /// @notice The abstract implementation of majority voting components
 /// @dev This component implements the `IMajorityVoting` interface
-abstract contract MajorityVoting is IMajorityVoting, MetaTxComponent, TimeHelpers {
+abstract contract MajorityVoting is IMajorityVoting, AragonAppMeta, TimeHelpers, AdaptiveERC165 {
     bytes4 internal constant MAJORITY_VOTING_INTERFACE_ID = type(IMajorityVoting).interfaceId;
     bytes32 public constant MODIFY_VOTE_CONFIG = keccak256("MODIFY_VOTE_CONFIG");
 
@@ -27,13 +29,11 @@ abstract contract MajorityVoting is IMajorityVoting, MetaTxComponent, TimeHelper
 
     /// @notice Initializes the component
     /// @dev This is required for the UUPS upgradability pattern
-    /// @param _dao The IDAO interface of the associated DAO
     /// @param _gsnForwarder The address of the trusted GSN forwarder required for meta transactions
     /// @param _participationRequiredPct The minimal required participation in percent.
     /// @param _supportRequiredPct The minimal required support in percent.
     /// @param _minDuration The minimal duration of a vote
     function __MajorityVoting_init(
-        IDAO _dao,
         address _gsnForwarder,
         uint64 _participationRequiredPct,
         uint64 _supportRequiredPct,
@@ -42,7 +42,7 @@ abstract contract MajorityVoting is IMajorityVoting, MetaTxComponent, TimeHelper
         _registerStandard(MAJORITY_VOTING_INTERFACE_ID);
         _validateAndSetSettings(_participationRequiredPct, _supportRequiredPct, _minDuration);
 
-        __MetaTxComponent_init(_dao, _gsnForwarder);
+        __MetaTxApp_init(_gsnForwarder);
 
         emit UpdateConfig(_participationRequiredPct, _supportRequiredPct, _minDuration);
     }
@@ -148,7 +148,7 @@ abstract contract MajorityVoting is IMajorityVoting, MetaTxComponent, TimeHelper
     /// @dev Internal function to execute a vote. It assumes the queried vote exists.
     /// @param _voteId the vote Id
     function _execute(uint256 _voteId) internal virtual {
-        bytes[] memory execResults = dao.execute(_voteId, votes[_voteId].actions);
+        bytes[] memory execResults = dao().execute(_voteId, votes[_voteId].actions);
 
         votes[_voteId].executed = true;
 

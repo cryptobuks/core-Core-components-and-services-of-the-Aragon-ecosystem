@@ -13,14 +13,12 @@ contract MajorityVotingMock is MajorityVoting {
     }
 
     function initializeMock(
-        IDAO _dao,
         address _gsnForwarder,
         uint64 _participationRequiredPct,
         uint64 _supportRequiredPct,
         uint64 _minDuration
     ) public initializer {
         __MajorityVoting_init(
-            _dao,
             _gsnForwarder,
             _participationRequiredPct,
             _supportRequiredPct,
