@@ -8,7 +8,7 @@ pragma solidity 0.8.10;
 /// @author Samuel Furter - Aragon Association - 2022
 abstract contract IDAO {
     bytes4 internal constant DAO_INTERFACE_ID = type(IDAO).interfaceId;
-
+    
     struct Action {
         address to; // Address to call.
         uint256 value; // Value to be sent with the call. for example (ETH)

@@ -22,6 +22,14 @@ contract DAO is IDAO, Initializable, UUPSUpgradeable, ACL, ERC1271, AdaptiveERC1
     using SafeERC20 for ERC20;
     using Address for address;
 
+    bytes32 internal constant INSTALL_PLUGIN = keccak256("INSTALL_PLUGIN");
+
+    struct Plugin {
+        bytes32 appId; // finance.aragonpm.eth
+        address logic; // finance base implementation
+        bytes initData; // finance initialize data
+    }
+
     // Roles
     bytes32 public constant UPGRADE_ROLE = keccak256("UPGRADE_ROLE");
     bytes32 public constant DAO_CONFIG_ROLE = keccak256("DAO_CONFIG_ROLE");
@@ -65,6 +73,15 @@ contract DAO is IDAO, Initializable, UUPSUpgradeable, ACL, ERC1271, AdaptiveERC1
 
     /// @dev Used to check the permissions within the upgradability pattern implementation of OZ
     function _authorizeUpgrade(address) internal virtual override auth(address(this), UPGRADE_ROLE) {}
+    
+
+    function installPlugins(Plugin[] calldata plugins) auth(address(this), INSTALL_PLUGIN) {
+        for(uint i = 0; i < plugins.length; i++) {
+            address proxy = new UUPSProxy(address(this), plugins[i].logic, plugins[i].initData);
+
+            emit PluginInstalled(plugins[i].appId, plugins[i].logic, proxy);
+        }
+    }
     
     /// @inheritdoc IDAO
     function setTrustedForwarder(

@@ -44,18 +44,18 @@ contract Repo is Initializable, UUPSUpgradeable, ACL {
     function _authorizeUpgrade(address) internal virtual override auth(address(this), UPGRADE_ROLE) {}
 
     /**
-     * @notice Create new version with contract `_pluginFactoryAddress` and content `@fromHex(_contentURI)`
+     * @notice Create new version with contract `_contractAddress` and content `@fromHex(_contentURI)`
      * @param _newSemanticVersion Semantic version for new repo version
-     * @param _pluginFactoryAddress address for smart contract logic for version (if set to 0, it uses last versions' pluginFactoryAddress)
+     * @param _contractAddress address for smart contract logic for version (if set to 0, it uses last versions' pluginFactoryAddress)
      * @param _contentURI External URI for fetching new version's content
      */
     function newVersion(
         uint16[3] memory _newSemanticVersion,
-        address _pluginFactoryAddress,
+        address _contractAddress,
         bytes calldata _contentURI
     ) external auth(address(this), CREATE_VERSION_ROLE) {
         // TODO: check if factoryAddress is IPluginFactory
-        address pluginFactoryAddress = _pluginFactoryAddress;
+        address pluginFactoryAddress = _contractAddress;
         uint256 lastVersionIndex = versionsNextIndex - 1;
 
         uint16[3] memory lastSematicVersion;
@@ -97,7 +97,7 @@ contract Repo is Initializable, UUPSUpgradeable, ACL {
         return getByVersionId(versionsNextIndex - 1);
     }
 
-    function getLatestForContractAddress(address _pluginFactoryAddress)
+    function getLatestForContractAddress(address _contractAddress)
         public
         view
         returns (
@@ -106,7 +106,7 @@ contract Repo is Initializable, UUPSUpgradeable, ACL {
             bytes memory contentURI
         )
     {
-        return getByVersionId(latestVersionIdForContract[_pluginFactoryAddress]);
+        return getByVersionId(latestVersionIdForContract[_contractAddress]);
     }
 
     function getBySemanticVersion(uint16[3] memory _semanticVersion)

@@ -46,22 +46,21 @@ contract DAOFactory {
         setupBases();
     }
 
-    function createDAO(DAOConfig calldata _daoConfig)
+    function createDAO(DAOConfig calldata _daoConfig, DAO.Plugin[] calldata plugins)
         external
         returns (DAO dao)
     {
         // create a DAO
         dao = _createDAO(_daoConfig);
 
-        VotingTest t = new VotingTest();
+        // grant INSTALL_PLUGIN permission
+        dao.grant(address(dao), address(this), dao.INSTALL_PLUGIN());
 
-        // UUPSProxy proxy = new UUPSProxy(address(dao), address(t), bytes(""));
+        // install plugins
+        dao.installPlugins(plugins);
 
-        // grant root permission to PluginInstaller
-        dao.grant(address(dao), address(pluginInstaller), dao.ROOT_ROLE());
-
-        // install packages
-        pluginInstaller.installPlugins(dao, packages);
+        // revoke INSTALL_PLUGIN permission
+        dao.revoke(address(dao), address(this), dao.INSTALL_PLUGIN());
 
         // setup dao permissions
         setDAOPermissions(dao);
@@ -84,7 +83,7 @@ contract DAOFactory {
     // @param _voting The voting contract address (whitelist OR ERC20 voting)
     function setDAOPermissions(DAO _dao) internal {
         // set roles on the dao itself.
-        ACLData.BulkItem[] memory items = new ACLData.BulkItem[](8);
+        ACLData.BulkItem[] memory items = new ACLData.BulkItem[](7);
 
         // Grant DAO all the permissions required
         items[0] = ACLData.BulkItem(ACLData.BulkOp.Grant, _dao.DAO_CONFIG_ROLE(), address(_dao));
@@ -96,9 +95,7 @@ contract DAOFactory {
 
         // Revoke permissions from factory
         items[6] = ACLData.BulkItem(ACLData.BulkOp.Revoke, _dao.ROOT_ROLE(), address(this));
-        // Revoke permissions from PluginInstaller
-        items[7] = ACLData.BulkItem(ACLData.BulkOp.Revoke, _dao.ROOT_ROLE(), address(pluginInstaller));
-
+        
         _dao.bulk(address(_dao), items);
     }
 
