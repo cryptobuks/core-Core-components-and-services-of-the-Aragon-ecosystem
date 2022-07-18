@@ -19,6 +19,7 @@ function createProxy(address _logic, bytes memory _data) returns(address payable
 }
 
 contract UUPSProxy is ERC1967Proxy, AppStorage {
+    
     constructor(
         address _dao,
         address _logic, 
