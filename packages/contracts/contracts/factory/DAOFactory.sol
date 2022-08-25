@@ -16,6 +16,8 @@ import "../utils/Proxy.sol";
 import "../tokens/MerkleMinter.sol";
 import "./TokenFactory.sol";
 
+import {PluginInstaller} from "../plugin/PluginInstaller.sol";
+
 /// @title DAOFactory
 /// @author Aragon Association - 2022
 /// @notice This contract is used to create a DAO.
@@ -31,6 +33,13 @@ contract DAOFactory {
 
     DAORegistry public daoRegistry;
     TokenFactory public tokenFactory;
+    PluginInstaller public pluginInstaller;
+
+    struct DAOSettings {
+        string name;
+        bytes metadata;
+        address trustedForwarder;
+    }
 
     struct DAOConfig {
         string name;
@@ -52,11 +61,94 @@ contract DAOFactory {
     /// @notice The constructor setting the registry and token factory address and creating the base contracts for the factory to clone from.
     /// @param _registry The DAO registry to register the DAO by its name.
     /// @param _tokenFactory The token factory for optional governance token creation.
-    constructor(DAORegistry _registry, TokenFactory _tokenFactory) {
+    constructor(
+        DAORegistry _registry,
+        TokenFactory _tokenFactory,
+        PluginInstaller _pluginInstaller
+    ) {
         daoRegistry = _registry;
         tokenFactory = _tokenFactory;
+        pluginInstaller = _pluginInstaller;
 
         setupBases();
+    }
+
+    function _createDAO(DAOSettings calldata _daoSettings) internal returns (DAO dao) {
+        // create dao
+        dao = DAO(createProxy(daoBase, bytes("")));
+        // initialize dao with the ROOT_ROLE as DAOFactory
+        dao.initialize(_daoSettings.metadata, address(this), _daoSettings.trustedForwarder);
+        // register dao with its name and token to the registry
+        daoRegistry.register(_daoSettings.name, dao, msg.sender);
+    }
+
+    function createDAOWithPlugins(
+        DAOSettings calldata _daoSettings,
+        PluginInstaller.InstallPlugin[] calldata plugins
+    ) external returns (DAO dao) {
+        // create a DAO
+        dao = _createDAO(_daoSettings);
+
+        // grant root permission to PluginInstaller
+        dao.grant(address(dao), address(pluginInstaller), dao.ROOT_PERMISSION_ID());
+
+        // insall plugins
+        for (uint256 i = 0; i < plugins.length; i++) {
+            pluginInstaller.installPlugin(address(dao), plugins[i]);
+        }
+
+        // grant root permission to PluginInstaller
+        dao.revoke(address(dao), address(pluginInstaller), dao.ROOT_PERMISSION_ID());
+
+        // setup dao permissions
+        _setDAOPermissions(dao);
+    }
+
+    function _setDAOPermissions(DAO _dao) internal {
+        // set permissionIds on the dao itself.
+        BulkPermissionsLib.ItemSingleTarget[]
+            memory items = new BulkPermissionsLib.ItemSingleTarget[](7);
+
+        // Grant DAO all the permissions required
+        items[0] = BulkPermissionsLib.ItemSingleTarget(
+            BulkPermissionsLib.Operation.Grant,
+            address(_dao),
+            _dao.SET_METADATA_PERMISSION_ID()
+        );
+        items[1] = BulkPermissionsLib.ItemSingleTarget(
+            BulkPermissionsLib.Operation.Grant,
+            address(_dao),
+            _dao.WITHDRAW_PERMISSION_ID()
+        );
+        items[2] = BulkPermissionsLib.ItemSingleTarget(
+            BulkPermissionsLib.Operation.Grant,
+            address(_dao),
+            _dao.UPGRADE_PERMISSION_ID()
+        );
+        items[3] = BulkPermissionsLib.ItemSingleTarget(
+            BulkPermissionsLib.Operation.Grant,
+            address(_dao),
+            _dao.ROOT_PERMISSION_ID()
+        );
+        items[4] = BulkPermissionsLib.ItemSingleTarget(
+            BulkPermissionsLib.Operation.Grant,
+            address(_dao),
+            _dao.SET_SIGNATURE_VALIDATOR_PERMISSION_ID()
+        );
+        items[5] = BulkPermissionsLib.ItemSingleTarget(
+            BulkPermissionsLib.Operation.Grant,
+            address(_dao),
+            _dao.SET_TRUSTED_FORWARDER_PERMISSION_ID()
+        );
+
+        // Revoke permissions from factory
+        items[6] = BulkPermissionsLib.ItemSingleTarget(
+            BulkPermissionsLib.Operation.Revoke,
+            address(this),
+            _dao.ROOT_PERMISSION_ID()
+        );
+
+        _dao.bulkOnSingleTarget(address(_dao), items);
     }
 
     /// @notice Creates a new DAO with the `ERC20Voting` component installed and deploys a new [ERC-20](https://eips.ethereum.org/EIPS/eip-20) governance token if the corresponding configuration is passed.

@@ -144,6 +144,10 @@ describe('DAOFactory: ', function () {
     const TokenFactory = await ethers.getContractFactory('TokenFactory');
     const tokenFactory = await TokenFactory.deploy();
 
+    // Plugin Installer
+    const PluginInstaller = await ethers.getContractFactory('PluginInstaller');
+    const pluginInstaller = await PluginInstaller.deploy();
+
     // Dao Facotry
     const DAOFactory = new ethers.ContractFactory(
       mergedABI,
@@ -153,7 +157,8 @@ describe('DAOFactory: ', function () {
 
     daoFactory = await DAOFactory.deploy(
       registry.address,
-      tokenFactory.address
+      tokenFactory.address,
+      pluginInstaller.address
     );
 
     const ActionExecuteContract = await ethers.getContractFactory(
