@@ -12,10 +12,14 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const managingDAOAddress = await getContractAddress('DAO', hre);
   const daoRegistryAddress = await getContractAddress('DAORegistry', hre);
   const tokenFactoryAddress = await getContractAddress('TokenFactory', hre);
+  const pluginInstallerAddress = await getContractAddress(
+    'PluginInstaller',
+    hre
+  );
 
   const ret = await deploy('DAOFactory', {
     from: deployer,
-    args: [daoRegistryAddress, tokenFactoryAddress],
+    args: [daoRegistryAddress, tokenFactoryAddress, pluginInstallerAddress],
     log: true,
   });
 
